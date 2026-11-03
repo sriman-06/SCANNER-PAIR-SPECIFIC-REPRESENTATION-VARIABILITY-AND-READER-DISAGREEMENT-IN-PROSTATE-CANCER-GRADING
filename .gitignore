@@ -1,0 +1,57 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Model caches
+hf_cache/
+.cache/
+.torch/
+huggingface/
+
+# Research data and annotations
+data/
+annotations/
+
+# Outputs and intermediate results
+outputs/
+results/
+checkpoints/
+embeddings/
+patches/
+thumbnails/
+
+# Whole-slide images
+*.svs
+*.ndpi
+*.mrxs
+*.scn
+*.tif
+*.tiff
+
+# Large archives
+*.zip
+*.7z
+*.rar
+
+# Sensitive metadata
+par_archive_metadata.json
+.env
+.env.*
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
