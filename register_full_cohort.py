@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import cv2
 import numpy as np
 import pandas as pd
@@ -7,18 +8,27 @@ from PIL import Image
 import json
 import traceback
 
-
 # ============================================================
 # CONFIGURATION
 # ============================================================
+# Project root defaults to the directory containing this script.
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-DATA_ROOT = Path(r"D:\ISBI_2027\data")
+# Dataset directory
+DATA_ROOT = Path(
+    os.environ.get(
+        "ISBI_DATA_ROOT",
+        PROJECT_ROOT / "data"
+    )
+).expanduser().resolve()
 
+# Registration output directory
 OUTPUT_ROOT = Path(
-    r"D:\ISBI_2027\outputs\registration_all"
-)
-
-OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    os.environ.get(
+        "ISBI_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "registration_all"
+    )
+).expanduser().resolve()
 
 SUMMARY_CSV = OUTPUT_ROOT / "registration_summary_all_30.csv"
 
@@ -735,6 +745,18 @@ def process_case(case):
 # ============================================================
 
 def main():
+
+    if not DATA_ROOT.is_dir():
+        raise FileNotFoundError(
+            f"Dataset directory not found: {DATA_ROOT}\n"
+            "Set ISBI_DATA_ROOT to the directory containing the cohort folders."
+        )
+
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 80)
+    print(f"Dataset directory: {DATA_ROOT}")
+    print(f"Registration output: {OUTPUT_ROOT}")
 
     print("=" * 80)
     print("FULL 30-SLIDE / 3-SCANNER REGISTRATION")

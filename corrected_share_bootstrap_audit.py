@@ -1,17 +1,32 @@
 
 from pathlib import Path
+import os
 import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-BASE = Path(r"D:\ISBI_2027")
-INPUT = (
-    BASE / "outputs" / "patient_pair_reproducibility_audit_27"
-    / "corrected_patient_hl_share.csv"
-)
-OUT_DIR = BASE / "outputs" / "isbi_frozen_results"
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+INPUT = Path(
+    os.environ.get(
+        "ISBI_CORRECTED_SHARE_INPUT",
+        PROJECT_ROOT / "outputs" / "patient_pair_reproducibility_audit_27"
+        / "corrected_patient_hl_share.csv"
+    )
+).expanduser().resolve()
+
+OUT_DIR = Path(
+    os.environ.get(
+        "ISBI_FROZEN_RESULTS_ROOT",
+        PROJECT_ROOT / "outputs" / "isbi_frozen_results"
+    )
+).expanduser().resolve()
+
+if not INPUT.is_file():
+    raise FileNotFoundError(f"Input file not found: {INPUT}")
+
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 N_BOOT = 10000

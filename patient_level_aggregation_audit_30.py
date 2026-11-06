@@ -10,21 +10,42 @@ from scipy.stats import spearmanr
 # 1. PATHS
 # ============================================================
 
-BASE = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-PROFILE_FILE = (
-    BASE / "outputs" / "label_blind_scanner_pair_audit_30"
-    / "label_blind_case_profile_30.csv"
-)
+PROFILE_FILE = Path(
+    os.environ.get(
+        "ISBI_PROFILE_PATH",
+        PROJECT_ROOT / "outputs" / "label_blind_scanner_pair_audit_30"
+        / "label_blind_case_profile_30.csv"
+    )
+).expanduser().resolve()
 
-LABEL_FILE = BASE / "annotations" / "slide_labels.tsv"
+LABEL_FILE = Path(
+    os.environ.get(
+        "ISBI_LABEL_PATH",
+        PROJECT_ROOT / "annotations" / "slide_labels.tsv"
+    )
+).expanduser().resolve()
 
-MAPPING_FILE = (
-    BASE / "outputs" / "patient_mapping_validation"
-    / "documented_patient_mapping.csv"
-)
+MAPPING_FILE = Path(
+    os.environ.get(
+        "ISBI_PATIENT_MAPPING_PATH",
+        PROJECT_ROOT / "outputs" / "patient_mapping_validation"
+        / "documented_patient_mapping.csv"
+    )
+).expanduser().resolve()
 
-OUT = BASE / "outputs" / "patient_level_aggregation_audit_30"
+OUT = Path(
+    os.environ.get(
+        "ISBI_PATIENT_AGGREGATION_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "patient_level_aggregation_audit_30"
+    )
+).expanduser().resolve()
+
+for input_file in [PROFILE_FILE, LABEL_FILE, MAPPING_FILE]:
+    if not input_file.is_file():
+        raise FileNotFoundError(f"Required input file not found: {input_file}")
+
 OUT.mkdir(parents=True, exist_ok=True)
 
 

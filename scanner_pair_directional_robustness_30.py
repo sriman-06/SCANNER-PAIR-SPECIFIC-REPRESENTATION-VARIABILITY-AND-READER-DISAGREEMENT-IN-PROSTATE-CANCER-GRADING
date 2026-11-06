@@ -21,6 +21,7 @@
 # ============================================================
 
 from pathlib import Path
+import os
 import warnings
 
 import numpy as np
@@ -35,28 +36,30 @@ warnings.filterwarnings("ignore")
 # PATHS
 # ------------------------------------------------------------
 
-BASE = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-MANIFEST = (
-    BASE
-    / "outputs"
-    / "uni2h_30"
-    / "embedding_manifest_30.csv"
-)
+EMBED_ROOT = Path(
+    os.environ.get(
+        "ISBI_EMBED_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "uni2h_30"
+    )
+).expanduser().resolve()
 
-LABEL_FILE = (
-    BASE
-    / "annotations"
-    / "slide_labels.tsv"
-)
+MANIFEST = EMBED_ROOT / "embedding_manifest_30.csv"
 
-OUT = (
-    BASE
-    / "outputs"
-    / "scanner_pair_directional_robustness_30"
-)
+LABEL_FILE = Path(
+    os.environ.get(
+        "ISBI_LABEL_PATH",
+        PROJECT_ROOT / "annotations" / "slide_labels.tsv"
+    )
+).expanduser().resolve()
 
-OUT.mkdir(parents=True, exist_ok=True)
+OUT = Path(
+    os.environ.get(
+        "ISBI_PAIR_ROBUSTNESS_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "scanner_pair_directional_robustness_30"
+    )
+).expanduser().resolve()
 
 SCANNERS = [
     "grundium",
@@ -203,9 +206,33 @@ lookup = {}
 
 for _, row in manifest.iterrows():
 
-    path = Path(
-        row["embedding_path"]
+    raw_path = Path(
+        str(row["embedding_path"]).strip().replace("\\\\", "/")
     )
+
+    candidates = []
+    if raw_path.is_absolute():
+        candidates.append(raw_path)
+    else:
+        candidates.extend([EMBED_ROOT / raw_path, PROJECT_ROOT / raw_path])
+
+    parts = list(raw_path.parts)
+    lower_parts = [part.lower() for part in parts]
+    if "embeddings" in lower_parts:
+        index = lower_parts.index("embeddings")
+        relative_parts = parts[index + 1:]
+        if relative_parts:
+            candidates.append(EMBED_ROOT / Path(*relative_parts))
+
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+
+    if path is None:
+        matches = list(EMBED_ROOT.rglob(raw_path.name))
+        if len(matches) == 1:
+            path = matches[0]
+
+    if path is None:
+        path = EMBED_ROOT / raw_path
 
     if not path.exists():
         raise FileNotFoundError(

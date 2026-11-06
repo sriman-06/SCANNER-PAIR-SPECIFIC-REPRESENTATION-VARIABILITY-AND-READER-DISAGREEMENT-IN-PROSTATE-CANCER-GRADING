@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import re
 import time
 
@@ -14,41 +15,28 @@ from timm.data import create_transform, resolve_data_config
 # CONFIGURATION
 # ============================================================
 
-ROOT = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-PATCH_ROOT = ROOT / "outputs" / "paired_patches_30"
+PATCH_ROOT = Path(
+    os.environ.get(
+        "ISBI_PATCH_ROOT",
+        PROJECT_ROOT / "outputs" / "paired_patches_30"
+    )
+).expanduser().resolve()
 
-MANIFEST_PATH = (
-    PATCH_ROOT /
-    "paired_patch_manifest_30.csv"
-)
+MANIFEST_PATH = PATCH_ROOT / "paired_patch_manifest_30.csv"
 
-OUTPUT_ROOT = (
-    ROOT /
-    "outputs" /
-    "uni2h_30"
-)
+OUTPUT_ROOT = Path(
+    os.environ.get(
+        "ISBI_EMBED_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "uni2h_30"
+    )
+).expanduser().resolve()
 
-EMBED_ROOT = (
-    OUTPUT_ROOT /
-    "embeddings"
-)
-
-EMBED_MANIFEST = (
-    OUTPUT_ROOT /
-    "embedding_manifest_30.csv"
-)
-
-EMBED_SUMMARY = (
-    OUTPUT_ROOT /
-    "embedding_summary_30.csv"
-)
-
-EMBED_QC = (
-    OUTPUT_ROOT /
-    "embedding_qc_30.csv"
-)
-
+EMBED_ROOT = OUTPUT_ROOT / "embeddings"
+EMBED_MANIFEST = OUTPUT_ROOT / "embedding_manifest_30.csv"
+EMBED_SUMMARY = OUTPUT_ROOT / "embedding_summary_30.csv"
+EMBED_QC = OUTPUT_ROOT / "embedding_qc_30.csv"
 MODEL_NAME = "hf-hub:MahmoodLab/UNI2-h"
 
 EXPECTED_DIM = 1536
@@ -110,51 +98,6 @@ print(f"Model: {MODEL_NAME}")
 print(f"Expected paired locations: {EXPECTED_LOCATIONS}")
 print(f"Expected images: {EXPECTED_IMAGES}")
 print(f"Expected embedding dimension: {EXPECTED_DIM}")
-
-print("=" * 80)
-
-
-# ============================================================
-# LOAD UNI2-h
-# ============================================================
-
-print("\nLoading UNI2-h...")
-
-timm_kwargs = {
-    "img_size": 224,
-    "patch_size": 14,
-    "depth": 24,
-    "num_heads": 24,
-    "init_values": 1e-5,
-    "embed_dim": 1536,
-    "mlp_ratio": 2.66667 * 2,
-    "num_classes": 0,
-    "no_embed_class": True,
-    "mlp_layer": timm.layers.SwiGLUPacked,
-    "act_layer": torch.nn.SiLU,
-    "reg_tokens": 8,
-    "dynamic_img_size": True,
-}
-
-model = timm.create_model(
-    MODEL_NAME,
-    pretrained=True,
-    **timm_kwargs,
-)
-
-model = model.to(DEVICE)
-
-model.eval()
-
-transform = create_transform(
-    **resolve_data_config(
-        model.pretrained_cfg,
-        model=model,
-    )
-)
-
-print("UNI2-h loaded successfully.")
-print(f"Embedding dimension: {EXPECTED_DIM}")
 
 print("=" * 80)
 
@@ -248,6 +191,50 @@ print(
 
 
 # ------------------------------------------------------------
+# ------------------------------------------------------------
+# CASE AND PATCH IDENTIFIER INTEGRITY
+# ------------------------------------------------------------
+
+identifier_columns = [
+    CASE_COLUMN,
+    PATCH_COLUMN
+]
+
+for column in identifier_columns:
+    invalid_ids = (
+        manifest[column].isna()
+        | manifest[column].astype(str).str.strip().eq("")
+    )
+
+    if invalid_ids.any():
+        raise RuntimeError(
+            f"Found {int(invalid_ids.sum())} missing or empty "
+            f"identifiers in column: {column}"
+        )
+
+duplicate_locations = manifest[
+    manifest.duplicated(
+        subset=[CASE_COLUMN, PATCH_COLUMN],
+        keep=False
+    )
+].sort_values(
+    [CASE_COLUMN, PATCH_COLUMN]
+)
+
+if not duplicate_locations.empty:
+    print("\nDuplicate case/patch identifiers:")
+    print(
+        duplicate_locations[
+            [CASE_COLUMN, PATCH_COLUMN]
+        ].to_string(index=False)
+    )
+
+    raise RuntimeError(
+        "Duplicate case/patch identifiers detected."
+    )
+
+print("Case/patch identifier integrity: PASS")
+
 # Cases
 # ------------------------------------------------------------
 
@@ -545,6 +532,69 @@ if len(jobs) != EXPECTED_IMAGES:
 print(
     "900-job construction: PASS"
 )
+
+
+# ============================================================
+# INPUT IMAGE PREFLIGHT
+
+missing_images = [
+    str(job["image_path"])
+    for job in jobs
+    if not job["image_path"].is_file()
+]
+
+if missing_images:
+    print(f"\nMissing input images: {len(missing_images)}")
+    for image_path in missing_images[:20]:
+        print(f"  {image_path}")
+    raise FileNotFoundError(
+        "Input image preflight failed. UNI2-h was not loaded."
+    )
+
+print("All 900 input image paths exist: PASS")
+
+# LOAD UNI2-h
+# ============================================================
+
+print("\nLoading UNI2-h...")
+
+timm_kwargs = {
+    "img_size": 224,
+    "patch_size": 14,
+    "depth": 24,
+    "num_heads": 24,
+    "init_values": 1e-5,
+    "embed_dim": 1536,
+    "mlp_ratio": 2.66667 * 2,
+    "num_classes": 0,
+    "no_embed_class": True,
+    "mlp_layer": timm.layers.SwiGLUPacked,
+    "act_layer": torch.nn.SiLU,
+    "reg_tokens": 8,
+    "dynamic_img_size": True,
+}
+
+model = timm.create_model(
+    MODEL_NAME,
+    pretrained=True,
+    **timm_kwargs,
+)
+
+model = model.to(DEVICE)
+
+model.eval()
+
+transform = create_transform(
+    **resolve_data_config(
+        model.pretrained_cfg,
+        model=model,
+    )
+)
+
+print("UNI2-h loaded successfully.")
+print(f"Embedding dimension: {EXPECTED_DIM}")
+
+print("=" * 80)
 
 
 # ============================================================
@@ -902,42 +952,52 @@ print(
 # FINAL COUNT CHECK
 # ============================================================
 
+if len(embedding_df) != EXPECTED_IMAGES:
+    raise RuntimeError(
+        f"Expected {EXPECTED_IMAGES} manifest records, "
+        f"found {len(embedding_df)}."
+    )
+
+job_duplicates = embedding_df[
+    embedding_df.duplicated(
+        subset=["case_id", "patch_id", "scanner"],
+        keep=False
+    )
+]
+
+if not job_duplicates.empty:
+    raise RuntimeError(
+        "Duplicate embedding jobs found in embedding manifest."
+    )
+
+if embedding_df["embedding_path"].duplicated().any():
+    raise RuntimeError(
+        "Duplicate embedding output paths found."
+    )
+
+print("900 manifest records and unique jobs: PASS")
+
 valid_statuses = [
     "PASS",
     "EXISTING_VALID",
 ]
 
 valid_df = embedding_df[
-    embedding_df["status"].isin(
-        valid_statuses
-    )
+    embedding_df["status"].isin(valid_statuses)
 ].copy()
 
 if len(valid_df) != EXPECTED_IMAGES:
-
     print("\nINVALID EMBEDDING COUNT.")
-
     print(
-        valid_df[
-            [
-                "case_id",
-                "patch_id",
-                "scanner",
-                "status"
-            ]
-        ].to_string(
-            index=False
-        )
+        embedding_df[
+            ["case_id", "patch_id", "scanner", "status"]
+        ].to_string(index=False)
     )
-
     raise RuntimeError(
-        f"Expected {EXPECTED_IMAGES} "
-        f"valid embeddings, found "
-        f"{len(valid_df)}."
+        f"Expected {EXPECTED_IMAGES} valid embeddings, "
+        f"found {len(valid_df)}."
     )
 
-
-# ============================================================
 # PHYSICAL EMBEDDING QC
 # ============================================================
 
@@ -1082,41 +1142,35 @@ print("=" * 80)
 
 structure = (
     qc_df
-    .groupby(
-        [
-            "case_id",
-            "scanner"
-        ]
-    )
+    .groupby(["case_id", "scanner"])
     .size()
-    .reset_index(
-        name="count"
+    .reindex(
+        pd.MultiIndex.from_product(
+            [cases, SCANNERS],
+            names=["case_id", "scanner"]
+        ),
+        fill_value=0
     )
+    .reset_index(name="count")
 )
 
 bad_structure = structure[
-    structure["count"] !=
-    EXPECTED_LOCATIONS_PER_CASE
+    structure["count"] != EXPECTED_LOCATIONS_PER_CASE
 ]
 
-if len(bad_structure) > 0:
-
-    print(
-        bad_structure.to_string(
-            index=False
-        )
-    )
-
+if not bad_structure.empty:
+    print(bad_structure.to_string(index=False))
     raise RuntimeError(
         "Case/scanner structure QC FAILED."
     )
 
-print(
-    "30 cases × 3 scanners × 10 patches: PASS"
-)
+if len(structure) != EXPECTED_CASES * EXPECTED_SCANNERS:
+    raise RuntimeError(
+        "Expected exactly 90 case/scanner combinations."
+    )
 
+print("30 cases x 3 scanners x 10 patches: PASS")
 
-# ============================================================
 # PATCH MATCHING QC
 # ============================================================
 

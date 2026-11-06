@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import cv2
 import numpy as np
 import pandas as pd
@@ -13,20 +14,32 @@ import random
 # CONFIGURATION
 # ============================================================
 
-DATA_ROOT = Path(r"D:\ISBI_2027\data")
+# Project root defaults to the directory containing this script.
+PROJECT_ROOT = Path(__file__).resolve().parent
 
+# Dataset directory
+DATA_ROOT = Path(
+    os.environ.get(
+        "ISBI_DATA_ROOT",
+        PROJECT_ROOT / "data"
+    )
+).expanduser().resolve()
+
+# Registration output directory
 REG_ROOT = Path(
-    r"D:\ISBI_2027\outputs\registration_all"
-)
+    os.environ.get(
+        "ISBI_REG_ROOT",
+        PROJECT_ROOT / "outputs" / "registration_all"
+    )
+).expanduser().resolve()
 
+# Paired patch output directory
 OUT_ROOT = Path(
-    r"D:\ISBI_2027\outputs\paired_patches_30"
-)
-
-OUT_ROOT.mkdir(
-    parents=True,
-    exist_ok=True
-)
+    os.environ.get(
+        "ISBI_PATCH_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "paired_patches_30"
+    )
+).expanduser().resolve()
 
 MANIFEST_OUT = (
     OUT_ROOT /
@@ -1566,8 +1579,34 @@ def process_case(case):
 
 def main():
 
+    if not DATA_ROOT.is_dir():
+        raise FileNotFoundError(
+            f"Dataset directory not found: {DATA_ROOT}\n"
+            "Set ISBI_DATA_ROOT to the directory containing the cohort folders."
+        )
+
+    if not REG_ROOT.is_dir():
+        raise FileNotFoundError(
+            f"Registration directory not found: {REG_ROOT}\n"
+            "Set ISBI_REG_ROOT to the registration output directory."
+        )
+
+    summary_path = REG_ROOT / "registration_summary_all_30.csv"
+
+    if not summary_path.is_file():
+        raise FileNotFoundError(
+            f"Registration summary not found: {summary_path}"
+        )
+
+    OUT_ROOT.mkdir(parents=True, exist_ok=True)
+
     random.seed(RANDOM_SEED)
     np.random.seed(RANDOM_SEED)
+
+    print("=" * 80)
+    print(f"Dataset directory: {DATA_ROOT}")
+    print(f"Registration directory: {REG_ROOT}")
+    print(f"Patch output directory: {OUT_ROOT}")
 
     print("=" * 80)
     print("30-SLIDE PAIRED PHYSICAL-PATCH EXTRACTION")

@@ -21,6 +21,7 @@
 # ================================================================
 
 from pathlib import Path
+import os
 import warnings
 
 import numpy as np
@@ -32,17 +33,35 @@ from scipy.stats import spearmanr, pearsonr, mannwhitneyu, kruskal
 
 
 # ================================================================
+
 # 1. PATHS
 # ================================================================
 
-ROOT = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-EMB_DIR = ROOT / "outputs" / "uni2h_30"
+EMB_DIR = Path(
+    os.environ.get(
+        "ISBI_EMBED_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "uni2h_30"
+    )
+).expanduser().resolve()
+
 MANIFEST_PATH = EMB_DIR / "embedding_manifest_30.csv"
 
-LABEL_PATH = ROOT / "annotations" / "slide_labels.tsv"
+LABEL_PATH = Path(
+    os.environ.get(
+        "ISBI_LABEL_PATH",
+        PROJECT_ROOT / "annotations" / "slide_labels.tsv"
+    )
+).expanduser().resolve()
 
-OUT_DIR = ROOT / "outputs" / "scanner_variability_30"
+OUT_DIR = Path(
+    os.environ.get(
+        "ISBI_VARIABILITY_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "scanner_variability_30"
+    )
+).expanduser().resolve()
+
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 PATCH_OUT = OUT_DIR / "scanner_variability_300.csv"
@@ -55,7 +74,6 @@ GROUP_OUT = OUT_DIR / "ambiguity_group_comparison.png"
 PAIR_FIG_OUT = OUT_DIR / "scanner_pair_comparison.png"
 
 
-# ================================================================
 # 2. SETTINGS
 # ================================================================
 
@@ -309,7 +327,7 @@ def resolve_embedding_path(p):
         return candidate
 
     # Relative to project root
-    candidate = ROOT / p
+    candidate = PROJECT_ROOT / p
 
     if candidate.exists():
         return candidate

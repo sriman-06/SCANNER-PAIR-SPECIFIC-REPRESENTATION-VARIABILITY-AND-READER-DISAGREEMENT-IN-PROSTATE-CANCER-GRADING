@@ -1,5 +1,6 @@
 
 from pathlib import Path
+import os
 
 import numpy as np
 import pandas as pd
@@ -10,15 +11,34 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-BASE = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-PROFILE_FILE = (
-    BASE / "outputs" / "label_blind_scanner_pair_audit_30" /
-    "label_blind_case_profile_30.csv"
-)
-LABEL_FILE = BASE / "annotations" / "slide_labels.tsv"
+PROFILE_FILE = Path(
+    os.environ.get(
+        "ISBI_PROFILE_PATH",
+        PROJECT_ROOT / "outputs" / "label_blind_scanner_pair_audit_30"
+        / "label_blind_case_profile_30.csv"
+    )
+).expanduser().resolve()
 
-OUT = BASE / "outputs" / "corrected_incremental_evaluation_30"
+LABEL_FILE = Path(
+    os.environ.get(
+        "ISBI_LABEL_PATH",
+        PROJECT_ROOT / "annotations" / "slide_labels.tsv"
+    )
+).expanduser().resolve()
+
+OUT = Path(
+    os.environ.get(
+        "ISBI_CORRECTED_EVALUATION_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "corrected_incremental_evaluation_30"
+    )
+).expanduser().resolve()
+
+for input_file in [PROFILE_FILE, LABEL_FILE]:
+    if not input_file.is_file():
+        raise FileNotFoundError(f"Required input file not found: {input_file}")
+
 OUT.mkdir(parents=True, exist_ok=True)
 
 SEED = 20271016

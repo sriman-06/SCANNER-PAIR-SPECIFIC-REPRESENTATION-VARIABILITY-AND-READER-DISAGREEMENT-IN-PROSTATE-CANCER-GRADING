@@ -1,5 +1,6 @@
 
 from pathlib import Path
+import os
 import ast
 import warnings
 
@@ -9,21 +10,39 @@ import torch
 from scipy.stats import spearmanr, rankdata
 import statsmodels.api as sm
 
-BASE = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-MANIFEST_PATH = (
-    BASE / "outputs" / "uni2h_30" / "embedding_manifest_30.csv"
-)
-PATIENT_PATH = (
-    BASE / "outputs" / "patient_level_aggregation_audit_30"
-    / "patient_level_aggregated_table.csv"
-)
-MAPPING_PATH = (
-    BASE / "outputs" / "patient_mapping_validation"
-    / "documented_patient_mapping.csv"
-)
-OUT = BASE / "outputs" / "patient_adjusted_audit_27"
-OUT.mkdir(parents=True, exist_ok=True)
+EMBED_ROOT = Path(
+    os.environ.get(
+        "ISBI_EMBED_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "uni2h_30"
+    )
+).expanduser().resolve()
+
+MANIFEST_PATH = EMBED_ROOT / "embedding_manifest_30.csv"
+
+PATIENT_PATH = Path(
+    os.environ.get(
+        "ISBI_PATIENT_TABLE_PATH",
+        PROJECT_ROOT / "outputs" / "patient_level_aggregation_audit_30"
+        / "patient_level_aggregated_table.csv"
+    )
+).expanduser().resolve()
+
+MAPPING_PATH = Path(
+    os.environ.get(
+        "ISBI_PATIENT_MAPPING_PATH",
+        PROJECT_ROOT / "outputs" / "patient_mapping_validation"
+        / "documented_patient_mapping.csv"
+    )
+).expanduser().resolve()
+
+OUT = Path(
+    os.environ.get(
+        "ISBI_PATIENT_ADJUSTED_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "patient_adjusted_audit_27"
+    )
+).expanduser().resolve()
 
 
 def norm_name(name):
@@ -44,12 +63,39 @@ def find_col(df, candidates, required=True):
 
 
 def load_embedding(path):
-    path = Path(path)
-    if not path.is_absolute():
-        path = BASE / path
+    raw_path = Path(str(path).strip().replace("\\\\", "/"))
 
-    if not path.exists():
-        raise FileNotFoundError(f"Embedding file not found: {path}")
+    candidates = []
+    if raw_path.is_absolute():
+        candidates.append(raw_path)
+    else:
+        candidates.extend([
+            EMBED_ROOT / raw_path,
+            PROJECT_ROOT / raw_path
+        ])
+
+    parts = list(raw_path.parts)
+    lower_parts = [part.lower() for part in parts]
+    if "embeddings" in lower_parts:
+        index = lower_parts.index("embeddings")
+        relative_parts = parts[index + 1:]
+        if relative_parts:
+            candidates.append(EMBED_ROOT / Path(*relative_parts))
+
+    path = next(
+        (candidate for candidate in candidates if candidate.is_file()),
+        None
+    )
+
+    if path is None:
+        matches = list(EMBED_ROOT.rglob(raw_path.name))
+        if len(matches) == 1:
+            path = matches[0]
+
+    if path is None:
+        raise FileNotFoundError(
+            f"Embedding file not found or path is ambiguous: {raw_path}"
+        )
 
     suffix = path.suffix.lower()
 
@@ -136,6 +182,12 @@ def partial_spearman(x, y, controls):
 
 
 def main():
+    for input_file in [MANIFEST_PATH, PATIENT_PATH, MAPPING_PATH]:
+        if not input_file.is_file():
+            raise FileNotFoundError(f"Required input file not found: {input_file}")
+
+    OUT.mkdir(parents=True, exist_ok=True)
+
     manifest = pd.read_csv(MANIFEST_PATH)
     patient_table = pd.read_csv(PATIENT_PATH)
     mapping = pd.read_csv(MAPPING_PATH)

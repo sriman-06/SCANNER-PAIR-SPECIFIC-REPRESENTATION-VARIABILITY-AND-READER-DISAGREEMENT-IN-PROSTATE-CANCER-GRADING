@@ -1,18 +1,31 @@
 
 from pathlib import Path
+import os
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-BASE = Path(r"D:\ISBI_2027")
-INPUT = (
-    BASE / "outputs" / "patient_level_aggregation_audit_30"
-    / "slide_level_table_with_share.csv"
-)
-OUT = (
-    BASE / "outputs" / "patient_level_aggregation_audit_30"
-)
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+INPUT = Path(
+    os.environ.get(
+        "ISBI_PATIENT_SLIDE_TABLE_PATH",
+        PROJECT_ROOT / "outputs" / "patient_level_aggregation_audit_30"
+        / "slide_level_table_with_share.csv"
+    )
+).expanduser().resolve()
+
+OUT = Path(
+    os.environ.get(
+        "ISBI_PATIENT_AGGREGATION_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "patient_level_aggregation_audit_30"
+    )
+).expanduser().resolve()
+
+if not INPUT.is_file():
+    raise FileNotFoundError(f"Input table not found: {INPUT}")
+
 OUT.mkdir(parents=True, exist_ok=True)
 
 df = pd.read_csv(INPUT)

@@ -1,27 +1,42 @@
 
 from pathlib import Path
+import os
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-BASE = Path(r"D:\ISBI_2027")
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-PAIR_PATH = (
-    BASE / "outputs" / "scanner_pair_directional_robustness_30"
-    / "scanner_pair_patch_level_900.csv"
-)
-MAP_PATH = (
-    BASE / "outputs" / "patient_mapping_validation"
-    / "documented_patient_mapping.csv"
-)
-PATIENT_PATH = (
-    BASE / "outputs" / "patient_level_aggregation_audit_30"
-    / "patient_level_aggregated_table.csv"
-)
+PAIR_PATH = Path(
+    os.environ.get(
+        "ISBI_PAIR_ROBUSTNESS_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "scanner_pair_directional_robustness_30"
+    )
+).expanduser().resolve() / "scanner_pair_patch_level_900.csv"
 
-OUT = BASE / "outputs" / "patient_incremental_value_audit_27"
-OUT.mkdir(parents=True, exist_ok=True)
+MAP_PATH = Path(
+    os.environ.get(
+        "ISBI_PATIENT_MAPPING_PATH",
+        PROJECT_ROOT / "outputs" / "patient_mapping_validation"
+        / "documented_patient_mapping.csv"
+    )
+).expanduser().resolve()
+
+PATIENT_PATH = Path(
+    os.environ.get(
+        "ISBI_PATIENT_TABLE_PATH",
+        PROJECT_ROOT / "outputs" / "patient_level_aggregation_audit_30"
+        / "patient_level_aggregated_table.csv"
+    )
+).expanduser().resolve()
+
+OUT = Path(
+    os.environ.get(
+        "ISBI_PATIENT_INCREMENTAL_OUTPUT_ROOT",
+        PROJECT_ROOT / "outputs" / "patient_incremental_value_audit_27"
+    )
+).expanduser().resolve()
 
 N_BOOT = 10000
 SEED = 20261016
@@ -121,6 +136,12 @@ def bootstrap_rhos_and_differences(
 
 
 def main():
+    for input_file in [PAIR_PATH, MAP_PATH, PATIENT_PATH]:
+        if not input_file.is_file():
+            raise FileNotFoundError(f"Required input file not found: {input_file}")
+
+    OUT.mkdir(parents=True, exist_ok=True)
+
     pairs = pd.read_csv(PAIR_PATH)
     mapping = pd.read_csv(MAP_PATH)
     patients = pd.read_csv(PATIENT_PATH)
